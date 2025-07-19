@@ -25,6 +25,12 @@ class WhiteBackgroundRemover {
         this.originalCtx = this.originalCanvas.getContext('2d');
         this.resultCtx = this.resultCanvas.getContext('2d');
         
+        // Canvas supplémentaires pour overlays
+        this.maskCanvas = null;
+        this.maskCtx = null;
+        this.uiCanvas = null;
+        this.uiCtx = null;
+        
         // Contrôles
         this.thresholdSlider = document.getElementById('thresholdSlider');
         this.toleranceSlider = document.getElementById('toleranceSlider');
@@ -41,6 +47,20 @@ class WhiteBackgroundRemover {
         
         // État du mode sélection
         this.selectionMode = false;
+        this.freehandMode = false;
+        
+        // Données de sélection libre
+        this.isDrawing = false;
+        this.drawingPath = [];
+        this.insideMask = null;
+        this.selectionMask = null;
+        this.referenceColor = null;
+        
+        // Nouveaux contrôles
+        this.freehandModeBtn = document.getElementById('freehandModeBtn');
+        this.freehandActionsGroup = document.getElementById('freehandActionsGroup');
+        this.applyBtn = document.getElementById('applyBtn');
+        this.cancelBtn = document.getElementById('cancelBtn');
         
         // Valeurs affichées
         this.thresholdValue = document.getElementById('thresholdValue');
@@ -77,6 +97,9 @@ class WhiteBackgroundRemover {
         this.downloadBtn.addEventListener('click', () => this.downloadResult());
         this.resetBtn.addEventListener('click', () => this.reset());
         this.selectionModeBtn.addEventListener('click', () => this.toggleSelectionMode());
+        this.freehandModeBtn.addEventListener('click', () => this.toggleFreehandMode());
+        this.applyBtn.addEventListener('click', () => this.applyFreehandSelection());
+        this.cancelBtn.addEventListener('click', () => this.cancelFreehandSelection());
         
         // Canvas click events
         this.resultCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
@@ -154,6 +177,17 @@ class WhiteBackgroundRemover {
         this.originalCanvas.height = height;
         this.resultCanvas.width = width;
         this.resultCanvas.height = height;
+        
+        // Initialiser les canvas supplémentaires
+        this.maskCanvas = document.getElementById('maskCanvas');
+        this.uiCanvas = document.getElementById('uiCanvas');
+        this.maskCtx = this.maskCanvas.getContext('2d');
+        this.uiCtx = this.uiCanvas.getContext('2d');
+        
+        this.maskCanvas.width = width;
+        this.maskCanvas.height = height;
+        this.uiCanvas.width = width;
+        this.uiCanvas.height = height;
         
         // Dessiner l'image originale
         this.originalCtx.drawImage(this.originalImage, 0, 0, width, height);
@@ -328,6 +362,14 @@ class WhiteBackgroundRemover {
         this.previewSection.classList.remove('selection-cursor');
         this.selectionToleranceSlider.value = 20;
         this.selectionToleranceValue.textContent = '20';
+        
+        // Reset du mode sélection libre
+        this.freehandMode = false;
+        this.freehandModeBtn.classList.remove('active');
+        this.freehandModeBtn.textContent = '✏️ Sélection libre';
+        this.freehandActionsGroup.style.display = 'none';
+        this.previewSection.classList.remove('freehand-cursor');
+        this.cancelFreehandSelection();
     }
 
     toggleSelectionMode() {
@@ -422,6 +464,235 @@ class WhiteBackgroundRemover {
         ctx.putImageData(imgData, 0, 0);
     }
 
+    toggleFreehandMode() {
+        this.freehandMode = !this.freehandMode;
+        
+        // Désactiver le mode sélection si actif
+        if (this.freehandMode && this.selectionMode) {
+            this.toggleSelectionMode();
+        }
+        
+        if (this.freehandMode) {
+            this.freehandModeBtn.classList.add('active');
+            this.freehandModeBtn.textContent = '✅ Mode sélection libre actif';
+            this.selectionToleranceGroup.style.display = 'block';
+            this.freehandActionsGroup.style.display = 'block';
+            this.previewSection.classList.add('freehand-cursor');
+            
+            // Ajouter les event listeners pour le dessin
+            this.uiCanvas.style.pointerEvents = 'auto';
+            this.uiCanvas.addEventListener('mousedown', this.startDrawing.bind(this));
+            this.uiCanvas.addEventListener('mousemove', this.draw.bind(this));
+            this.uiCanvas.addEventListener('mouseup', this.stopDrawing.bind(this));
+            this.uiCanvas.addEventListener('mouseleave', this.stopDrawing.bind(this));
+        } else {
+            this.freehandModeBtn.classList.remove('active');
+            this.freehandModeBtn.textContent = '✏️ Sélection libre';
+            this.selectionToleranceGroup.style.display = 'none';
+            this.freehandActionsGroup.style.display = 'none';
+            this.previewSection.classList.remove('freehand-cursor');
+            
+            // Retirer les event listeners
+            this.uiCanvas.style.pointerEvents = 'none';
+            this.uiCanvas.removeEventListener('mousedown', this.startDrawing.bind(this));
+            this.uiCanvas.removeEventListener('mousemove', this.draw.bind(this));
+            this.uiCanvas.removeEventListener('mouseup', this.stopDrawing.bind(this));
+            this.uiCanvas.removeEventListener('mouseleave', this.stopDrawing.bind(this));
+            
+            // Nettoyer
+            this.cancelFreehandSelection();
+        }
+    }
+
+    startDrawing(e) {
+        if (!this.freehandMode) return;
+        
+        this.isDrawing = true;
+        this.drawingPath = [];
+        
+        const rect = this.uiCanvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * (this.uiCanvas.width / rect.width));
+        const y = Math.floor((e.clientY - rect.top) * (this.uiCanvas.height / rect.height));
+        
+        this.drawingPath.push({x, y});
+        
+        // Nettoyer les canvas
+        this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+        this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+    }
+
+    draw(e) {
+        if (!this.isDrawing || !this.freehandMode) return;
+        
+        const rect = this.uiCanvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * (this.uiCanvas.width / rect.width));
+        const y = Math.floor((e.clientY - rect.top) * (this.uiCanvas.height / rect.height));
+        
+        this.drawingPath.push({x, y});
+        
+        // Dessiner le tracé
+        this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+        this.uiCtx.strokeStyle = '#FF5722';
+        this.uiCtx.lineWidth = 2;
+        this.uiCtx.lineJoin = 'round';
+        this.uiCtx.lineCap = 'round';
+        
+        this.uiCtx.beginPath();
+        this.uiCtx.moveTo(this.drawingPath[0].x, this.drawingPath[0].y);
+        
+        for (let i = 1; i < this.drawingPath.length; i++) {
+            this.uiCtx.lineTo(this.drawingPath[i].x, this.drawingPath[i].y);
+        }
+        
+        this.uiCtx.stroke();
+    }
+
+    stopDrawing() {
+        if (!this.isDrawing || this.drawingPath.length < 3) {
+            this.isDrawing = false;
+            return;
+        }
+        
+        this.isDrawing = false;
+        
+        // Fermer le tracé
+        this.uiCtx.closePath();
+        this.uiCtx.stroke();
+        
+        // Créer le masque intérieur et calculer la couleur de référence
+        this.createInsideMask();
+        this.calculateReferenceColor();
+        this.updateSelectionPreview();
+    }
+
+    createInsideMask() {
+        const width = this.uiCanvas.width;
+        const height = this.uiCanvas.height;
+        this.insideMask = new Uint8Array(width * height);
+        
+        // Utiliser Path2D pour le test point-in-polygon
+        const path = new Path2D();
+        path.moveTo(this.drawingPath[0].x, this.drawingPath[0].y);
+        
+        for (let i = 1; i < this.drawingPath.length; i++) {
+            path.lineTo(this.drawingPath[i].x, this.drawingPath[i].y);
+        }
+        path.closePath();
+        
+        // Tester chaque pixel
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                if (this.uiCtx.isPointInPath(path, x, y)) {
+                    this.insideMask[y * width + x] = 1;
+                }
+            }
+        }
+    }
+
+    calculateReferenceColor() {
+        if (!this.drawingPath.length) return;
+        
+        const imgData = this.resultCtx.getImageData(0, 0, this.resultCanvas.width, this.resultCanvas.height);
+        const data = imgData.data;
+        
+        let r = 0, g = 0, b = 0, count = 0;
+        
+        // Calculer la moyenne des couleurs sur le tracé
+        for (const point of this.drawingPath) {
+            const idx = (point.y * this.resultCanvas.width + point.x) * 4;
+            if (data[idx + 3] > 0) { // Ignorer les pixels transparents
+                r += data[idx];
+                g += data[idx + 1];
+                b += data[idx + 2];
+                count++;
+            }
+        }
+        
+        if (count > 0) {
+            this.referenceColor = {
+                r: Math.round(r / count),
+                g: Math.round(g / count),
+                b: Math.round(b / count)
+            };
+        }
+    }
+
+    updateSelectionPreview() {
+        if (!this.referenceColor || !this.insideMask) return;
+        
+        const tolerance = parseInt(this.selectionToleranceSlider.value);
+        const MAX_D2 = 195075; // 3 * 255^2
+        const maxD2 = Math.pow(tolerance / 100, 2) * MAX_D2;
+        
+        const width = this.maskCanvas.width;
+        const height = this.maskCanvas.height;
+        
+        const imgData = this.resultCtx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+        
+        // Créer le masque de sélection
+        this.selectionMask = new Uint8Array(width * height);
+        
+        // Créer l'overlay rouge
+        const overlayData = this.maskCtx.createImageData(width, height);
+        const overlay = overlayData.data;
+        
+        for (let i = 0; i < width * height; i++) {
+            if (this.insideMask[i] === 1) {
+                const idx = i * 4;
+                const dr = data[idx] - this.referenceColor.r;
+                const dg = data[idx + 1] - this.referenceColor.g;
+                const db = data[idx + 2] - this.referenceColor.b;
+                const d2 = dr * dr + dg * dg + db * db;
+                
+                if (d2 <= maxD2 && data[idx + 3] > 0) {
+                    this.selectionMask[i] = 1;
+                    // Overlay rouge semi-transparent
+                    overlay[idx] = 255;
+                    overlay[idx + 1] = 0;
+                    overlay[idx + 2] = 0;
+                    overlay[idx + 3] = 90;
+                }
+            }
+        }
+        
+        this.maskCtx.putImageData(overlayData, 0, 0);
+    }
+
+    applyFreehandSelection() {
+        if (!this.selectionMask) return;
+        
+        const imgData = this.resultCtx.getImageData(0, 0, this.resultCanvas.width, this.resultCanvas.height);
+        const data = imgData.data;
+        
+        // Appliquer la transparence aux pixels sélectionnés
+        for (let i = 0; i < this.selectionMask.length; i++) {
+            if (this.selectionMask[i] === 1) {
+                data[i * 4 + 3] = 0;
+            }
+        }
+        
+        this.resultCtx.putImageData(imgData, 0, 0);
+        
+        // Nettoyer
+        this.cancelFreehandSelection();
+    }
+
+    cancelFreehandSelection() {
+        this.drawingPath = [];
+        this.insideMask = null;
+        this.selectionMask = null;
+        this.referenceColor = null;
+        
+        // Nettoyer les canvas
+        if (this.uiCtx) {
+            this.uiCtx.clearRect(0, 0, this.uiCanvas.width, this.uiCanvas.height);
+        }
+        if (this.maskCtx) {
+            this.maskCtx.clearRect(0, 0, this.maskCanvas.width, this.maskCanvas.height);
+        }
+    }
+
     showError(message) {
         alert(message); // Simple pour l'instant, pourrait être amélioré avec une notification
     }
@@ -429,5 +700,44 @@ class WhiteBackgroundRemover {
 
 // Initialiser l'application au chargement de la page
 document.addEventListener('DOMContentLoaded', () => {
-    new WhiteBackgroundRemover();
+    const app = new WhiteBackgroundRemover();
+    
+    // Gestion des tooltips
+    document.querySelectorAll('.param .help').forEach(btn => {
+        const tipId = btn.getAttribute('aria-describedby');
+        const tip = document.getElementById(tipId);
+        if (!tip) return;
+        
+        const show = () => { tip.hidden = false; };
+        const hide = () => { tip.hidden = true; };
+        
+        btn.addEventListener('mouseenter', show);
+        btn.addEventListener('mouseleave', hide);
+        btn.addEventListener('focus', show);
+        btn.addEventListener('blur', hide);
+        btn.addEventListener('keydown', e => { 
+            if (e.key === 'Escape') hide(); 
+        });
+        
+        // Support mobile
+        let tapCount = 0;
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            tapCount++;
+            if (tapCount === 1) {
+                show();
+                setTimeout(() => { tapCount = 0; }, 2000);
+            } else {
+                hide();
+                tapCount = 0;
+            }
+        });
+    });
+    
+    // Mise à jour dynamique avec tolérance de sélection
+    document.getElementById('selectionToleranceSlider').addEventListener('input', () => {
+        if (app.freehandMode && app.referenceColor) {
+            app.updateSelectionPreview();
+        }
+    });
 });

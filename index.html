@@ -34,16 +34,30 @@
             <!-- Contrôles -->
             <section class="controls-section" id="controlsSection" style="display: none;">
                 <div class="controls">
-                    <div class="control-group">
-                        <label for="thresholdSlider">Seuil de blanc:</label>
-                        <input type="range" id="thresholdSlider" min="200" max="255" value="240" step="1">
-                        <span id="thresholdValue">240</span>
+                    <div class="control-group param">
+                        <label for="thresholdSlider">
+                            Seuil de blanc
+                            <button class="help" aria-describedby="tip-threshold" type="button">?</button>
+                        </label>
+                        <input type="range" id="thresholdSlider" min="200" max="255" value="240" step="1" aria-describedby="hint-threshold tip-threshold">
+                        <output id="thresholdValue">240</output>
+                        <div id="hint-threshold" class="hint">Détecte les pixels très clairs.</div>
+                        <div id="tip-threshold" role="tooltip" class="tooltip" hidden>
+                            Les pixels au-dessus de ce seuil peuvent être rendus transparents.
+                        </div>
                     </div>
                     
-                    <div class="control-group">
-                        <label for="toleranceSlider">Tolérance:</label>
-                        <input type="range" id="toleranceSlider" min="0" max="50" value="10" step="1">
-                        <span id="toleranceValue">10</span>
+                    <div class="control-group param">
+                        <label for="toleranceSlider">
+                            Tolérance
+                            <button class="help" aria-describedby="tip-tolerance" type="button">?</button>
+                        </label>
+                        <input type="range" id="toleranceSlider" min="0" max="50" value="10" step="1" aria-describedby="hint-tolerance tip-tolerance">
+                        <output id="toleranceValue">10</output>
+                        <div id="hint-tolerance" class="hint">Inclut les couleurs proches.</div>
+                        <div id="tip-tolerance" role="tooltip" class="tooltip" hidden>
+                            Ajuste la sensibilité : élevé = englobe des variations d'éclairage.
+                        </div>
                     </div>
 
                     <div class="control-group">
@@ -58,10 +72,28 @@
                         <small>Cliquez sur une zone pour la supprimer</small>
                     </div>
 
+                    <div class="control-group">
+                        <button class="freehand-mode-btn" id="freehandModeBtn">✏️ Sélection libre</button>
+                        <small>Dessinez une zone à main levée</small>
+                    </div>
+
                     <div class="control-group" id="selectionToleranceGroup" style="display: none;">
-                        <label for="selectionToleranceSlider">Tolérance sélection:</label>
-                        <input type="range" id="selectionToleranceSlider" min="0" max="100" value="20" step="1">
-                        <span id="selectionToleranceValue">20</span>
+                        <label for="selectionToleranceSlider" class="param">
+                            Tolérance sélection
+                            <button class="help" aria-describedby="tip-selection-tolerance" type="button">?</button>
+                        </label>
+                        <input type="range" id="selectionToleranceSlider" min="0" max="100" value="20" step="1" aria-describedby="hint-selection-tolerance tip-selection-tolerance">
+                        <output id="selectionToleranceValue">20</output>
+                        <div id="hint-selection-tolerance" class="hint">Inclut les couleurs proches.</div>
+                        <div id="tip-selection-tolerance" role="tooltip" class="tooltip" hidden>
+                            Ajuste la sensibilité : élevé = englobe des variations d'éclairage.
+                        </div>
+                    </div>
+
+                    <div class="control-group" id="freehandActionsGroup" style="display: none;">
+                        <button class="apply-btn" id="applyBtn">✅ Appliquer</button>
+                        <button class="cancel-btn" id="cancelBtn">❌ Annuler</button>
+                        <div class="hint">Appliquer modifie l'image | Annuler efface la sélection</div>
                     </div>
 
                     <button class="process-btn" id="processBtn">Traiter l'image</button>
@@ -78,7 +110,11 @@
                     
                     <div class="preview-item">
                         <h3>Résultat</h3>
-                        <canvas id="resultCanvas"></canvas>
+                        <div class="canvas-stack">
+                            <canvas id="resultCanvas"></canvas>
+                            <canvas id="maskCanvas"></canvas>
+                            <canvas id="uiCanvas"></canvas>
+                        </div>
                         <div class="result-actions">
                             <button class="download-btn" id="downloadBtn">⬇️ Télécharger PNG</button>
                         </div>

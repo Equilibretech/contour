@@ -53,6 +53,17 @@
                         </label>
                     </div>
 
+                    <div class="control-group">
+                        <button class="selection-mode-btn" id="selectionModeBtn">🎯 Mode sélection de zone</button>
+                        <small>Cliquez sur une zone pour la supprimer</small>
+                    </div>
+
+                    <div class="control-group" id="selectionToleranceGroup" style="display: none;">
+                        <label for="selectionToleranceSlider">Tolérance sélection:</label>
+                        <input type="range" id="selectionToleranceSlider" min="0" max="100" value="20" step="1">
+                        <span id="selectionToleranceValue">20</span>
+                    </div>
+
                     <button class="process-btn" id="processBtn">Traiter l'image</button>
                 </div>
             </section>

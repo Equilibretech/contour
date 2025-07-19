@@ -188,6 +188,50 @@ header p {
     box-shadow: none;
 }
 
+/* Mode sélection */
+.selection-mode-btn {
+    background: linear-gradient(135deg, #9C27B0, #7B1FA2);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    width: 100%;
+}
+
+.selection-mode-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(156,39,176,0.3);
+}
+
+.selection-mode-btn.active {
+    background: linear-gradient(135deg, #4CAF50, #45a049);
+    box-shadow: 0 0 0 2px rgba(76,175,80,0.3);
+}
+
+.selection-mode-btn.active::before {
+    content: "✅ ";
+}
+
+.control-group small {
+    opacity: 0.7;
+    font-size: 0.8rem;
+    margin-top: 4px;
+    display: block;
+}
+
+/* Curseur en mode sélection */
+.selection-cursor {
+    cursor: crosshair !important;
+}
+
+.selection-cursor canvas {
+    cursor: crosshair !important;
+}
+
 /* Preview Section */
 .preview-section {
     background: white;

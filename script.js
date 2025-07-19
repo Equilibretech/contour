@@ -33,6 +33,15 @@ class WhiteBackgroundRemover {
         this.downloadBtn = document.getElementById('downloadBtn');
         this.resetBtn = document.getElementById('resetBtn');
         
+        // Contrôles mode sélection
+        this.selectionModeBtn = document.getElementById('selectionModeBtn');
+        this.selectionToleranceSlider = document.getElementById('selectionToleranceSlider');
+        this.selectionToleranceGroup = document.getElementById('selectionToleranceGroup');
+        this.selectionToleranceValue = document.getElementById('selectionToleranceValue');
+        
+        // État du mode sélection
+        this.selectionMode = false;
+        
         // Valeurs affichées
         this.thresholdValue = document.getElementById('thresholdValue');
         this.toleranceValue = document.getElementById('toleranceValue');
@@ -59,11 +68,18 @@ class WhiteBackgroundRemover {
         this.toleranceSlider.addEventListener('input', (e) => {
             this.toleranceValue.textContent = e.target.value;
         });
+        this.selectionToleranceSlider.addEventListener('input', (e) => {
+            this.selectionToleranceValue.textContent = e.target.value;
+        });
         
         // Button events
         this.processBtn.addEventListener('click', () => this.processImage());
         this.downloadBtn.addEventListener('click', () => this.downloadResult());
         this.resetBtn.addEventListener('click', () => this.reset());
+        this.selectionModeBtn.addEventListener('click', () => this.toggleSelectionMode());
+        
+        // Canvas click events
+        this.resultCanvas.addEventListener('click', (e) => this.handleCanvasClick(e));
     }
 
     handleDragOver(e) {
@@ -303,6 +319,107 @@ class WhiteBackgroundRemover {
         this.thresholdValue.textContent = '240';
         this.toleranceValue.textContent = '10';
         this.smoothEdges.checked = true;
+        
+        // Reset du mode sélection
+        this.selectionMode = false;
+        this.selectionModeBtn.classList.remove('active');
+        this.selectionModeBtn.textContent = '🎯 Mode sélection de zone';
+        this.selectionToleranceGroup.style.display = 'none';
+        this.previewSection.classList.remove('selection-cursor');
+        this.selectionToleranceSlider.value = 20;
+        this.selectionToleranceValue.textContent = '20';
+    }
+
+    toggleSelectionMode() {
+        this.selectionMode = !this.selectionMode;
+        
+        if (this.selectionMode) {
+            this.selectionModeBtn.classList.add('active');
+            this.selectionModeBtn.textContent = '✅ Mode sélection actif';
+            this.selectionToleranceGroup.style.display = 'block';
+            this.previewSection.classList.add('selection-cursor');
+        } else {
+            this.selectionModeBtn.classList.remove('active');
+            this.selectionModeBtn.textContent = '🎯 Mode sélection de zone';
+            this.selectionToleranceGroup.style.display = 'none';
+            this.previewSection.classList.remove('selection-cursor');
+        }
+    }
+
+    handleCanvasClick(e) {
+        if (!this.selectionMode || !this.originalImage) return;
+        
+        const rect = this.resultCanvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) * (this.resultCanvas.width / rect.width));
+        const y = Math.floor((e.clientY - rect.top) * (this.resultCanvas.height / rect.height));
+        
+        // Vérifier que le clic est dans les limites du canvas
+        if (x >= 0 && x < this.resultCanvas.width && y >= 0 && y < this.resultCanvas.height) {
+            const tolerance = parseInt(this.selectionToleranceSlider.value);
+            this.floodFillTransparent(x, y, tolerance);
+        }
+    }
+
+    floodFillTransparent(xStart, yStart, tolerance) {
+        const canvas = this.resultCanvas;
+        const ctx = this.resultCtx;
+        const { width, height } = canvas;
+        const imgData = ctx.getImageData(0, 0, width, height);
+        const data = imgData.data;
+
+        // Convertir slider -> distance max au carré
+        const MAX_D2 = 195075; // 3 * 255^2
+        const maxD2 = Math.pow(tolerance / 100, 2) * MAX_D2;
+
+        const idx = (x, y) => (y * width + x) * 4;
+
+        const i0 = idx(xStart, yStart);
+        const r0 = data[i0], g0 = data[i0 + 1], b0 = data[i0 + 2];
+        
+        // Si le pixel de départ est déjà transparent, ne rien faire
+        if (data[i0 + 3] === 0) return;
+
+        const visited = new Uint8Array(width * height);
+        const stack = [[xStart, yStart]];
+        visited[yStart * width + xStart] = 1;
+
+        while (stack.length > 0) {
+            const [x, y] = stack.pop();
+            const i = idx(x, y);
+            
+            // Si le pixel est déjà transparent, passer au suivant
+            if (data[i + 3] === 0) continue;
+            
+            const dr = data[i] - r0;
+            const dg = data[i + 1] - g0;
+            const db = data[i + 2] - b0;
+            const d2 = dr * dr + dg * dg + db * db;
+            
+            if (d2 <= maxD2) {
+                // Rendre transparent
+                data[i + 3] = 0;
+
+                // Voisins (4-connexe)
+                if (x > 0 && !visited[y * width + (x - 1)]) {
+                    visited[y * width + (x - 1)] = 1;
+                    stack.push([x - 1, y]);
+                }
+                if (x + 1 < width && !visited[y * width + (x + 1)]) {
+                    visited[y * width + (x + 1)] = 1;
+                    stack.push([x + 1, y]);
+                }
+                if (y > 0 && !visited[(y - 1) * width + x]) {
+                    visited[(y - 1) * width + x] = 1;
+                    stack.push([x, y - 1]);
+                }
+                if (y + 1 < height && !visited[(y + 1) * width + x]) {
+                    visited[(y + 1) * width + x] = 1;
+                    stack.push([x, y + 1]);
+                }
+            }
+        }
+
+        ctx.putImageData(imgData, 0, 0);
     }
 
     showError(message) {

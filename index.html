@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suppresseur de Fond Blanc</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🖼️ Suppresseur de Fond Blanc</h1>
+            <p>Supprimez automatiquement les fonds blancs de vos images PNG</p>
+        </header>
+
+        <main>
+            <!-- Zone de upload -->
+            <section class="upload-section">
+                <div class="drop-zone" id="dropZone">
+                    <div class="drop-content">
+                        <svg class="upload-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7,10 12,15 17,10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        <h3>Glissez votre image PNG ici</h3>
+                        <p>ou <button class="browse-btn" id="browseBtn">parcourez vos fichiers</button></p>
+                        <small>Formats acceptés: PNG, JPG, JPEG</small>
+                    </div>
+                    <input type="file" id="fileInput" accept="image/*" hidden>
+                </div>
+            </section>
+
+            <!-- Contrôles -->
+            <section class="controls-section" id="controlsSection" style="display: none;">
+                <div class="controls">
+                    <div class="control-group">
+                        <label for="thresholdSlider">Seuil de blanc:</label>
+                        <input type="range" id="thresholdSlider" min="200" max="255" value="240" step="1">
+                        <span id="thresholdValue">240</span>
+                    </div>
+                    
+                    <div class="control-group">
+                        <label for="toleranceSlider">Tolérance:</label>
+                        <input type="range" id="toleranceSlider" min="0" max="50" value="10" step="1">
+                        <span id="toleranceValue">10</span>
+                    </div>
+
+                    <div class="control-group">
+                        <label>
+                            <input type="checkbox" id="smoothEdges" checked>
+                            Lisser les bords
+                        </label>
+                    </div>
+
+                    <button class="process-btn" id="processBtn">Traiter l'image</button>
+                </div>
+            </section>
+
+            <!-- Prévisualisation -->
+            <section class="preview-section" id="previewSection" style="display: none;">
+                <div class="preview-container">
+                    <div class="preview-item">
+                        <h3>Image originale</h3>
+                        <canvas id="originalCanvas"></canvas>
+                    </div>
+                    
+                    <div class="preview-item">
+                        <h3>Résultat</h3>
+                        <canvas id="resultCanvas"></canvas>
+                        <div class="result-actions">
+                            <button class="download-btn" id="downloadBtn">⬇️ Télécharger PNG</button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Zone de reset -->
+            <section class="reset-section" id="resetSection" style="display: none;">
+                <button class="reset-btn" id="resetBtn">🔄 Nouvelle image</button>
+            </section>
+        </main>
+
+        <footer>
+            <p>Traitement d'images 100% côté client - Vos données restent privées</p>
+        </footer>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
